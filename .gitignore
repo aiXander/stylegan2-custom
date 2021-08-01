@@ -8,3 +8,12 @@ _cudacache/
 *.pkl
 *.avi
 *.mp4
+
+
+# Secret Files (for now)
+src/live_GAN_utils.py
+src/beat_modulation_multi.py
+src/modulation_utils.py
+
+src/renders
+src/tmp_unzip

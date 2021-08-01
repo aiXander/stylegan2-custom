@@ -1,4 +1,4 @@
-﻿# Copyright (c) 2019, NVIDIA Corporation. All rights reserved.
+# Copyright (c) 2019, NVIDIA Corporation. All rights reserved.
 # This work is made available under the Nvidia Source Code License-NC.
 # https://nvlabs.github.io/stylegan2/license.html
 """Network architectures used in the StyleGAN2 paper."""
@@ -145,7 +145,13 @@ def G_synthesis_stylegan2(
     fused_modconv       = True,         # Implement modulated_conv2d_layer() as a single fused op?
     verbose             = False,      #
     impl                = 'cuda',     # Custom ops implementation - cuda (original) or ref (no compiling)
+    noise_strength_multipliers = None,
     **_kwargs):                         # Ignore unrecognized keyword args.
+    
+    if _kwargs['icrease_feature_maps']:
+        fmap_base = 32 << 10
+        fmap_max = 1024
+        dlatent_size = 1024
 
     res_log2 = int(np.log2(resolution))
     assert resolution == 2**res_log2 and resolution >= 4
@@ -188,13 +194,18 @@ def G_synthesis_stylegan2(
             x = fix_size(x, size, scale_type)
             # multi latent blending
             x = multimask(x, size, latmask, countHW, splitfine)
+
+        noise_random = tf.random_normal([tf.shape(x)[0], 1, x.shape[2], x.shape[3]], dtype=x.dtype)
+        noise_fixed = tf.cast(noise_inputs[layer_idx], x.dtype)
+        noise_fixed = fix_size(noise_fixed, (x.shape[2], x.shape[3]), scale_type=scale_type)
+
         if randomize_noise:
-            noise = tf.random_normal([tf.shape(x)[0], 1, x.shape[2], x.shape[3]], dtype=x.dtype)
+            t = noise_strength_multipliers[layer_idx] if (noise_strength_multipliers is not None) else 1.0
         else:
-            noise = tf.cast(noise_inputs[layer_idx], x.dtype)
-            noise = fix_size(noise, (x.shape[2], x.shape[3]), scale_type=scale_type)
+            t = 0
+
         noise_strength = tf.get_variable('noise_strength', shape=[], initializer=tf.initializers.zeros())
-        x += noise * tf.cast(noise_strength, x.dtype)
+        x += (t*noise_random + (1-t)*noise_fixed) * tf.cast(noise_strength, x.dtype)
         return apply_bias_act(x, act=act, impl=impl)
 
     # Building blocks for main layers.

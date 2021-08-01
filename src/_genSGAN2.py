@@ -30,7 +30,6 @@ parser.add_argument('--trunc', type=float, default=0.8, help='truncation psi 0..
 parser.add_argument('--labels', default=None, help='labels/categories for conditioning')
 parser.add_argument('--digress', type=float, default=0, help='distortion technique by Aydao (strength of the effect)') 
 parser.add_argument('--save_lat', action='store_true', help='save latent vectors to file')
-parser.add_argument('--seed', type=int, default=None)
 parser.add_argument('--verbose', '-v', action='store_true')
 parser.add_argument('--ops', default='cuda', help='custom op implementation (cuda or ref)')
 # animation
@@ -44,8 +43,8 @@ if a.size is not None: a.size = [int(s) for s in a.size.split('-')][::-1]
 
 def main():
     os.makedirs(a.out_dir, exist_ok=True)
-    if a.seed==0: a.seed = None
-    np.random.seed(seed=a.seed)
+    seed = 696
+    np.random.seed(seed=seed)
 
     # setup generator
     fmt = dict(func=tflib.convert_images_to_uint8, nchw_to_nhwc=True)
@@ -95,6 +94,10 @@ def main():
     else: # reconstruct network
         print(' .. Gs custom ..', basename(a.model))
         # print(Gs_kwargs)
+
+        Gs_kwargs['latent_size'] = 1024
+        print(Gs_kwargs)
+
         Gs = tflib.Network('Gs', **Gs_kwargs)
         Gs.copy_vars_from(network)
     if a.verbose is True: print('kwargs:', ['%s: %s'%(kv[0],kv[1]) for kv in sorted(Gs.static_kwargs.items())])
@@ -105,7 +108,7 @@ def main():
     if a.verbose is True: print(' making timeline..')
     lats = [] # list of [frm,1,512]
     for i in range(n_mult):
-        lat_tmp = latent_anima((1, Gs.input_shape[1]), a.frames, a.fstep, cubic=a.cubic, gauss=a.gauss, seed=a.seed, verbose=False) # [frm,1,512]
+        lat_tmp = latent_anima((1, Gs.input_shape[1]), a.frames, a.fstep, cubic=a.cubic, gauss=a.gauss, verbose=False) # [frm,1,512]
         lats.append(lat_tmp) # list of [frm,1,512]
     latents = np.concatenate(lats, 1) # [frm,X,512]
     print(' latents', latents.shape)
@@ -119,7 +122,7 @@ def main():
         except: init_res = (4,4) # default initial layer size 
         dconst = []
         for i in range(n_mult):
-            dc_tmp = a.digress * latent_anima([1, latent_size, *init_res], a.frames, a.fstep, cubic=True, seed=a.seed, verbose=False)
+            dc_tmp = a.digress * latent_anima([1, latent_size, *init_res], a.frames, a.fstep, cubic=True, verbose=False)
             dconst.append(dc_tmp)
         dconst = np.concatenate(dconst, 1)
     else:
@@ -176,3 +179,13 @@ def main():
         
 if __name__ == '__main__':
     main()
+
+
+    '''
+    
+    python3 src/_genSGAN2.py --model '/home/rednax/Desktop/music_vr/StyleGAN_training/stylegan2-ada/results/Dark_512_2/network-snapshot-000348' --out_dir '_out/Dark' --frames '50-10' --size 1024-512 --cubic
+        
+    python3 src/_genSGAN2.py --model '/home/rednax/Desktop/music_vr/StyleGAN_training/stylegan2-ada/results/Patterns_512/network-snapshot-000236' --out_dir '_out/Dark' --frames '200-24' --size 2048-1024 --cubic
+
+    
+    '''

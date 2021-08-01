@@ -246,6 +246,13 @@ def G_mapping(
     impl                    = 'cuda',       # Custom ops implementation - cuda (original) or ref (no compiling)
     **_kwargs):                             # Ignore unrecognized keyword args.
 
+    if _kwargs['icrease_feature_maps']:
+        normalize_latents = False
+        latent_size = 1024
+        dlatent_size = 1024
+        mapping_fmaps = 1024
+        mapping_layers = 4
+
     act = mapping_nonlinearity
 
     # Inputs.
